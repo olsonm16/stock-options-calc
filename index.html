@@ -15,10 +15,39 @@
       /* Adjust the space between entries */
     }
 
+    #financials {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .financial {
+      flex: 1;
+      min-width: 200px;
+      /* Minimum width for each entry to ensure they wrap */
+    }
+
     .optionEntry {
       flex: 1;
       min-width: 200px;
       /* Minimum width for each entry to ensure they wrap */
+    }
+
+    #total-profit {
+      color: white;
+    }
+
+    #tax-rate {
+      color: goldenrod;
+    }
+
+    #tax-owed {
+      color: red;
+    }
+
+    #net-profit {
+      color: green;
+      font-weight: bold;
     }
 
     body {
@@ -32,6 +61,9 @@
 <body>
   <main>
     <h3>Stock Option Tax Calculator</h3>
+    <div id="results"></div>
+    <hr>
+
     <form id="stockOptionsForm">
       <div id="optionsContainer">
         <div class="optionEntry">
@@ -40,20 +72,25 @@
         </div>
       </div>
       <button type="button" onclick="addOptionEntry()">Add Another Option</button>
-      <label>Exercise Price: <input type="number" name="exercisePrice" step="0.01"></label>
-      <label>Other W-2 Income: <input type="number" name="otherIncome" step="0.01"></label>
-      <label>Tax Filing Status:
-        <select name="filingStatus">
-          <option value="single">Single</option>
-          <option value="marriedFilingJointly">Married Filing Jointly</option>
-          <option value="marriedFilingSeparately">Married Filing Separately</option>
-          <option value="headOfHousehold">Head of Household</option>
-        </select>
-      </label>
+      <div id="financials">
+        <div class="financial"><label>Exercise Price: <input type="number" name="exercisePrice" step="0.01"></label>
+        </div>
+        <div class="financial"><label>Other W-2 Income: <input type="number" name="otherIncome" step="0.01"></label>
+        </div>
+        <div class="financial">
+          <label>Tax Filing Status:
+            <select name="filingStatus">
+              <option value="single">Single</option>
+              <option value="marriedFilingJointly">Married Filing Jointly</option>
+              <option value="marriedFilingSeparately">Married Filing Separately</option>
+              <option value="headOfHousehold">Head of Household</option>
+            </select>
+          </label>
+        </div>
+      </div>
       <button type="button" onclick="calculateTax()">Calculate</button>
       <button type="button" onclick="resetEntries()">Reset</button>
     </form>
-    <div id="results"></div>
   </main>
   <footer>
     Created by Mitch Olson. Styling from simplecss.org.
@@ -145,11 +182,27 @@
         let netOptionProfit = totalOptionProfit - taxOnOptions;
         let taxRate = effectiveTaxRate * 100;
 
+        const computeEmoji = function (amount) {
+          if (amount < 75000) {
+            return "🏎️";
+          } else if (amount >= 75000 && amount < 150000) {
+            return "🏠";
+          } else if (amount >= 150000 && amount < 300000) {
+            return "🌇";
+          } else if (amount < 500000) {
+            return "🛩️";
+          } else if (amount < 750000) {
+            return "🚀";
+          } else {
+            return "🏦";
+          }
+        }
+
         document.getElementById('results').innerHTML = `
-            <div>Total Option Profit: ${currencyFormatter(totalOptionProfit)}</div>
-            <div>Effective Tax Rate: ${taxRate.toFixed(2)}%</div>
-            <div>Tax on Options: ${currencyFormatter(taxOnOptions)}</div>
-            <div>Net Option Profit: ${currencyFormatter(netOptionProfit)}</div>
+            <div id="total-profit">Total Option Profit: ${currencyFormatter(totalOptionProfit)}</div>
+            <div id="tax-rate">Effective Tax Rate: ${taxRate.toFixed(2)}%</div>
+            <div id="tax-owed">Tax on Options: ${currencyFormatter(taxOnOptions)}</div>
+            <div id="net-profit">Net Option Profit: ${currencyFormatter(netOptionProfit)} ${computeEmoji(netOptionProfit)}</div>
         `;
         window.saveFormToSession();
       };
