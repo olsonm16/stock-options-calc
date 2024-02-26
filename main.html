@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Option Tax Calculator</title>
+  <!-- Minified version -->
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+  <style>
+    #optionsContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      /* Adjust the space between entries */
+    }
+
+    .optionEntry {
+      flex: 1;
+      min-width: 200px;
+      /* Minimum width for each entry to ensure they wrap */
+    }
+
+    body {
+      font-size: 1.1rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h3>Stock Option Tax Calculator</h3>
+    <form id="stockOptionsForm">
+      <div id="optionsContainer">
+        <div class="optionEntry">
+          <label>Strike Price: <input type="number" name="strikePrice[]" step="0.01"></label>
+          <label>Number of Options: <input type="number" name="numberOfOptions[]" step="1"></label>
+        </div>
+      </div>
+      <button type="button" onclick="addOptionEntry()">Add Another Option</button>
+      <label>Exercise Price: <input type="number" name="exercisePrice" step="0.01"></label>
+      <label>Other W-2 Income: <input type="number" name="otherIncome" step="0.01"></label>
+      <label>Tax Filing Status:
+        <select name="filingStatus">
+          <option value="single">Single</option>
+          <option value="marriedFilingJointly">Married Filing Jointly</option>
+          <option value="marriedFilingSeparately">Married Filing Separately</option>
+          <option value="headOfHousehold">Head of Household</option>
+        </select>
+      </label>
+      <button type="button" onclick="calculateTax()">Calculate</button>
+      <button type="button" onclick="resetEntries()">Reset</button>
+    </form>
+    <div id="results"></div>
+  </main>
+  <footer>
+    Created by Mitch Olson. Styling from simplecss.org.
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Define tax brackets for 2024
+      const taxBrackets = {
+        single: [
+          { threshold: 0, rate: 0.10 },
+          { threshold: 11600, rate: 0.12 },
+          { threshold: 47150, rate: 0.22 },
+          { threshold: 100525, rate: 0.24 },
+          { threshold: 191950, rate: 0.32 },
+          { threshold: 243725, rate: 0.35 },
+          { threshold: 609350, rate: 0.37 }
+        ],
+        marriedFilingJointly: [
+          { threshold: 0, rate: 0.10 },
+          { threshold: 23200, rate: 0.12 },
+          { threshold: 94300, rate: 0.22 },
+          { threshold: 201050, rate: 0.24 },
+          { threshold: 383900, rate: 0.32 },
+          { threshold: 487450, rate: 0.35 },
+          { threshold: 731200, rate: 0.37 }
+        ],
+        headOfHousehold: [
+          { threshold: 0, rate: 0.10 },
+          { threshold: 16550, rate: 0.12 },
+          { threshold: 63100, rate: 0.22 },
+          { threshold: 100500, rate: 0.24 },
+          { threshold: 191950, rate: 0.32 },
+          { threshold: 243700, rate: 0.35 },
+          { threshold: 609350, rate: 0.37 }
+        ]
+      };
+
+      window.saveFormToSession = function () {
+        const formData = {
+          strikePrices: Array.from(document.querySelectorAll('input[name="strikePrice[]"]')).map(input => input.value),
+          numberOfOptions: Array.from(document.querySelectorAll('input[name="numberOfOptions[]"]')).map(input => input.value),
+          exercisePrice: document.querySelector('input[name="exercisePrice"]').value,
+          otherIncome: document.querySelector('input[name="otherIncome"]').value,
+          filingStatus: document.querySelector('select[name="filingStatus"]').value
+        };
+        sessionStorage.setItem('stockOptionsFormData', JSON.stringify(formData));
+      }
+
+
+      window.addOptionEntry = function () {
+        const container = document.getElementById('optionsContainer');
+        const newEntry = container.firstElementChild.cloneNode(true);
+        newEntry.querySelectorAll('input').forEach(input => input.value = '');
+        container.appendChild(newEntry);
+      };
+
+      window.resetEntries = function () {
+        sessionStorage.setItem('stockOptionsFormData', '{}');
+        document.getElementById('stockOptionsForm').reset();
+      };
+
+      window.currencyFormatter = function (value) {
+        return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+      }
+
+      window.calculateTax = function () {
+        const form = document.getElementById('stockOptionsForm');
+        const filingStatus = form.filingStatus.value;
+        const exercisePrice = parseFloat(form.exercisePrice.value);
+        const otherIncome = parseFloat(form.otherIncome.value || 0);
+        let totalOptionProfit = 0;
+
+        // Calculate profit from options
+        const strikePrices = form.querySelectorAll('input[name="strikePrice[]"]');
+        const numberOfOptions = form.querySelectorAll('input[name="numberOfOptions[]"]');
+        for (let i = 0; i < strikePrices.length; i++) {
+          const profitPerOption = (exercisePrice - parseFloat(strikePrices[i].value)) * parseFloat(numberOfOptions[i].value);
+          totalOptionProfit += Math.max(0, profitPerOption);
+        }
+
+        // Calculate total income to determine tax rate
+        let totalIncome = Number(otherIncome + totalOptionProfit).toFixed(4)
+        let totalTax = calculateTaxFromBrackets(totalIncome, taxBrackets[filingStatus]);
+
+        // Calculate taxes due on option profit by applying effective tax rate
+        let effectiveTaxRate = (totalTax / totalIncome);
+        let taxOnOptions = totalOptionProfit * effectiveTaxRate;
+        let netOptionProfit = totalOptionProfit - taxOnOptions;
+        let taxRate = effectiveTaxRate * 100;
+
+        document.getElementById('results').innerHTML = `
+            <div>Total Option Profit: ${currencyFormatter(totalOptionProfit)}</div>
+            <div>Effective Tax Rate: ${taxRate.toFixed(2)}%</div>
+            <div>Tax on Options: ${currencyFormatter(taxOnOptions)}</div>
+            <div>Net Option Profit: ${currencyFormatter(netOptionProfit)}</div>
+        `;
+        window.saveFormToSession();
+      };
+
+      function calculateTaxFromBrackets(income, brackets) {
+        let tax = 0;
+        for (let i = 0; i < brackets.length; i++) {
+          if (income > brackets[i].threshold) {
+            let nextThreshold = i < brackets.length - 1 ? brackets[i + 1].threshold : income;
+            let taxableIncome = Math.min(income, nextThreshold) - brackets[i].threshold;
+            tax += taxableIncome * brackets[i].rate;
+          } else break;
+        }
+        return tax;
+      }
+
+      const savedData = JSON.parse(sessionStorage.getItem('stockOptionsFormData'));
+      if (savedData && savedData.strikePrices !== undefined) {
+        // Load saved data into the form
+        // This example assumes you have functions to dynamically add option entries as needed
+        savedData.strikePrices.forEach((price, index) => {
+          if (index > 0) addOptionEntry(); // Assuming addOptionEntry is a function to add a new set of input fields
+          document.querySelectorAll('input[name="strikePrice[]"]')[index].value = price;
+        });
+        savedData.numberOfOptions.forEach((number, index) => {
+          document.querySelectorAll('input[name="numberOfOptions[]"]')[index].value = number;
+        });
+        document.querySelector('input[name="exercisePrice"]').value = savedData.exercisePrice;
+        document.querySelector('input[name="otherIncome"]').value = savedData.otherIncome;
+        document.querySelector('select[name="filingStatus"]').value = savedData.filingStatus;
+        calculateTax();
+      }
+
+      document.getElementById('stockOptionsForm').addEventListener('input', () => {
+        saveFormToSession();
+      });
+    });
+  </script>
+</body>
+
+</html>
